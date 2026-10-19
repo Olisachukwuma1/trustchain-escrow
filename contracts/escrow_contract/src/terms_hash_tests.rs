@@ -194,6 +194,93 @@ mod terms_hash_tests {
     }
 
     #[test]
+    fn test_dex_swap_accepts_amount_at_remaining_balance_limit() {
+        let (env, admin, client, freelancer, contract) = setup();
+        let token = register_token(&env, &admin, &client, 50_000);
+        let token_out = register_token(&env, &admin, &freelancer, 50_000);
+
+        let escrow_id = contract.create_escrow(
+            &client,
+            &freelancer,
+            &token,
+            &30_000_i128,
+            &hash32(&env),
+            &None,
+            &None,
+            &None,
+            &None,
+            &no_multisig(&env),
+            &None,
+        );
+
+        set_dex_config(
+            &env,
+            &DexConfig {
+                dex_contract_id: Address::generate(&env),
+                supported_pairs: SorobanVec::from_array(&env, [(token.clone(), token_out.clone())]),
+            },
+        );
+
+        let record = contract.try_swap_asset_via_dex(
+            &client,
+            &escrow_id,
+            &token,
+            &token_out,
+            &30_000_i128,
+            &1_i128,
+        );
+
+        assert!(record.is_ok());
+        assert_eq!(record.unwrap().unwrap().amount_in, 30_000_i128);
+    }
+
+    #[test]
+    fn test_dex_swap_rejects_amount_above_remaining_balance_with_stable_error() {
+        let (env, admin, client, freelancer, contract) = setup();
+        let token = register_token(&env, &admin, &client, 50_000);
+        let token_out = register_token(&env, &admin, &freelancer, 50_000);
+
+        let escrow_id = contract.create_escrow(
+            &client,
+            &freelancer,
+            &token,
+            &30_000_i128,
+            &hash32(&env),
+            &None,
+            &None,
+            &None,
+            &None,
+            &no_multisig(&env),
+            &None,
+        );
+
+        set_dex_config(
+            &env,
+            &DexConfig {
+                dex_contract_id: Address::generate(&env),
+                supported_pairs: SorobanVec::from_array(
+                    &env,
+                    [(token.clone(), token_out.clone())],
+                ),
+            },
+        );
+
+        let result = contract.try_swap_asset_via_dex(
+            &client,
+            &escrow_id,
+            &token,
+            &token_out,
+            &30_001_i128,
+            &1_i128,
+        );
+
+        assert_eq!(
+            result,
+            Err(Ok(EscrowError::SwapAmountExceedsRemainingBalance))
+        );
+    }
+
+    #[test]
     fn test_dex_swap_rejects_unsupported_pair() {
         let (env, admin, client, freelancer, contract) = setup();
         let token = register_token(&env, &admin, &client, 50_000);
@@ -218,10 +305,7 @@ mod terms_hash_tests {
             &env,
             &DexConfig {
                 dex_contract_id: Address::generate(&env),
-                supported_pairs: SorobanVec::from_array(
-                    &env,
-                    [(token.clone(), token_out.clone())],
-                ),
+                supported_pairs: SorobanVec::from_array(&env, [(token.clone(), token_out.clone())]),
             },
         );
 

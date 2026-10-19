@@ -3996,7 +3996,7 @@ impl EscrowContract {
             return Err(EscrowError::InvalidSwapParameters);
         }
         if amount_in > meta.remaining_balance {
-            return Err(EscrowError::InvalidSwapParameters);
+            return Err(EscrowError::SwapAmountExceedsRemainingBalance);
         }
 
         let now = env.ledger().timestamp();

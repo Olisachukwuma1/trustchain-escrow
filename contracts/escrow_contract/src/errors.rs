@@ -122,6 +122,8 @@ pub enum EcErr {
     DexNotConfigured = 97,
     /// The arbiter fee in basis points is invalid.
     ArbiterFeeBpsInvalid = 98,
+    /// The swap input exceeds the escrow's remaining balance.
+    SwapAmountExceedsRemainingBalance = 99,
 }
 
 /// Backward-compatible alias — existing code imports `EscrowError`; the oracle
