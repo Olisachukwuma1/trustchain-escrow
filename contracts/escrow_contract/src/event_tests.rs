@@ -6,7 +6,7 @@ mod event_tests {
         token, Address, BytesN, Env, String, Symbol, TryFromVal, Val,
     };
 
-    use crate::{EscrowContract, EscrowContractClient, EscrowError, MultisigConfig};
+    use crate::{DexConfig, EscrowContract, EscrowContractClient, EscrowError, MultisigConfig};
 
     fn no_multisig(env: &Env) -> MultisigConfig {
         MultisigConfig {
@@ -818,5 +818,73 @@ mod event_tests {
         for sym in expected {
             assert!(topic_names.contains(&sym), "Missing event: {sym:?}");
         }
+    }
+
+    // ── DEX swap indexing ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_dex_swap_event_contains_limit_and_outcome() {
+        let (env, admin, contract_id, client) = setup();
+        let client_addr = Address::generate(&env);
+        let freelancer = Address::generate(&env);
+        let token_in = register_token(&env, &admin, &client_addr, 1_000);
+        let token_out = register_token(&env, &admin, &freelancer, 1_000);
+        let escrow_id = client.create_escrow(
+            &client_addr,
+            &freelancer,
+            &token_in,
+            &1_000_i128,
+            &BytesN::from_array(&env, &[1; 32]),
+            &None,
+            &None,
+            &None,
+            &None,
+            &no_multisig(&env),
+            &None,
+        );
+        crate::terms_hash::set_dex_config(
+            &env,
+            &DexConfig {
+                dex_contract_id: Address::generate(&env),
+                supported_pairs: soroban_sdk::Vec::from_array(
+                    &env,
+                    [(token_in.clone(), token_out.clone())],
+                ),
+            },
+        );
+        env.ledger().set_timestamp(42);
+
+        client.swap_asset_via_dex(
+            &client_addr,
+            &escrow_id,
+            &token_in,
+            &token_out,
+            &500_i128,
+            &500_i128,
+        );
+
+        let events = contract_events(&env, &contract_id);
+        let (_, topics, data) = events
+            .iter()
+            .find(|(_, t, _)| has_topic_symbol(&env, t, soroban_sdk::symbol_short!("dex_swap")))
+            .expect("dex_swap event not emitted");
+        assert_eq!(topic_u64(&env, &topics, 1), escrow_id);
+
+        let (emitted_in, emitted_out, amount_in, min_amount_out, amount_out, swapped_at, success): (
+            Address,
+            Address,
+            i128,
+            i128,
+            Option<i128>,
+            Option<u64>,
+            bool,
+        ) = soroban_sdk::FromVal::from_val(&env, &data);
+        assert_eq!(emitted_in, token_in);
+        assert_eq!(emitted_out, token_out);
+        assert_eq!(amount_in, 500);
+        assert_eq!(min_amount_out, 500);
+        assert_eq!(amount_out, Some(500));
+        assert_eq!(swapped_at, Some(42));
+        assert!(success);
     }
 }

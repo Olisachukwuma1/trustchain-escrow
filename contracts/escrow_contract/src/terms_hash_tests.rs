@@ -237,6 +237,44 @@ mod terms_hash_tests {
     }
 
     #[test]
+    fn test_dex_swap_rejects_minimum_above_simulated_output() {
+        let (env, admin, client, freelancer, contract) = setup();
+        let token = register_token(&env, &admin, &client, 50_000);
+        let token_out = register_token(&env, &admin, &freelancer, 50_000);
+        let escrow_id = contract.create_escrow(
+            &client,
+            &freelancer,
+            &token,
+            &30_000_i128,
+            &hash32(&env),
+            &None,
+            &None,
+            &None,
+            &None,
+            &no_multisig(&env),
+            &None,
+        );
+        set_dex_config(
+            &env,
+            &DexConfig {
+                dex_contract_id: Address::generate(&env),
+                supported_pairs: SorobanVec::from_array(&env, [(token.clone(), token_out.clone())]),
+            },
+        );
+
+        let result = contract.try_swap_asset_via_dex(
+            &client,
+            escrow_id.unwrap(),
+            &token,
+            &token_out,
+            &5_000_i128,
+            &5_001_i128,
+        );
+
+        assert_eq!(result, Err(Ok(EscrowError::InvalidSwapParameters)));
+    }
+
+    #[test]
     fn test_dex_swap_rejects_non_client() {
         let (env, admin, client, freelancer, contract) = setup();
         let token = register_token(&env, &admin, &client, 50_000);

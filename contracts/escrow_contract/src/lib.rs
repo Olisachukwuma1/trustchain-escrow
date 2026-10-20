@@ -3995,6 +3995,11 @@ impl EscrowContract {
             return Err(EscrowError::InvalidSwapParameters);
         }
 
+        let amount_out = amount_in;
+        if min_amount_out > amount_out {
+            return Err(EscrowError::InvalidSwapParameters);
+        }
+
         let now = env.ledger().timestamp();
         let record = DexSwapRecord {
             escrow_id,
@@ -4002,7 +4007,7 @@ impl EscrowContract {
             token_out: token_out.clone(),
             amount_in,
             min_amount_out,
-            amount_out: Some(amount_in),
+            amount_out: Some(amount_out),
             swapped_at: Some(now),
             success: true,
         };
@@ -4018,7 +4023,7 @@ impl EscrowContract {
             .ok_or(EscrowError::E20)?;
         ContractStorage::save_escrow_meta(&env, &meta);
 
-        events::emit_dex_swap(&env, escrow_id, &token_in, &token_out, amount_in);
+        events::emit_dex_swap(&env, &record);
         Ok(record)
     }
 

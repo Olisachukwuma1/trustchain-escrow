@@ -556,16 +556,18 @@ pub fn emit_terms_accepted(env: &Env, escrow_id: u64, client: &Address) {
 // ── DEX swap (#123) ──────────────────────────────────────────────────────
 
 /// Emitted when a simulated DEX swap is recorded for an escrow.
-pub fn emit_dex_swap(
-    env: &Env,
-    escrow_id: u64,
-    token_in: &Address,
-    token_out: &Address,
-    amount_in: i128,
-) {
+pub fn emit_dex_swap(env: &Env, record: &crate::DexSwapRecord) {
     env.events().publish(
-        (ev::DEX_SWAP, escrow_id),
-        (token_in.clone(), token_out.clone(), amount_in),
+        (ev::DEX_SWAP, record.escrow_id),
+        (
+            record.token_in.clone(),
+            record.token_out.clone(),
+            record.amount_in,
+            record.min_amount_out,
+            record.amount_out,
+            record.swapped_at,
+            record.success,
+        ),
     );
 }
 
